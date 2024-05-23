@@ -49,9 +49,9 @@ async def start(message: Message):
     cursor.execute("SELECT id FROM admins WHERE id = %s", (message.chat.id,))
     is_admin = bool(cursor.fetchone())
     if is_admin:
-        greeting = "Привет, администратор! 👋\n\n"
+        greeting = "Привет, администратор!"
     else:
-        greeting = "Привет, пользователь! 👋\n\n"
+        greeting = "Привет, пользователь!"
     await message.answer(greeting, reply_markup=get_keyboard(is_admin))
 
 
