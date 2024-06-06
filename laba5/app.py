@@ -20,6 +20,8 @@ cursor = conn.cursor()
 router = Router()
 
 ADMIN_ID = ['762606808']
+
+
 async def main():
     # Получение токена из переменных окружения
     bot_token = os.getenv('API_TOKEN')
@@ -28,9 +30,9 @@ async def main():
     # команды для пользователей
     await bot.set_my_commands(
         [
-        BotCommand(command="/start", description="Начать работу"),
-        BotCommand(command="/convert", description="Конвертировать валюту"),
-        BotCommand(command="/get_currencies", description="Получить список всех валют")
+            BotCommand(command="/start", description="Начать работу"),
+            BotCommand(command="/convert", description="Конвертировать валюту"),
+            BotCommand(command="/get_currencies", description="Получить список всех валют")
         ],
         scope=BotCommandScopeDefault())
     # команды для админов
@@ -56,11 +58,13 @@ async def main():
 
 # Классы для хранения состояний
 class Currency(StatesGroup):
-    waiting_for_currency_name = State()
-    waiting_for_currency_rate = State()
+    state_currency_name = State()
+    state_currency_rate = State()
+
+
 class Conversion(StatesGroup):
-    waiting_for_currency_name = State()
-    waiting_for_amount = State()
+    state_currency_name = State()
+    state_amount = State()
 
 
 # Получаем все данные из таблицы admins
@@ -87,6 +91,7 @@ def get_keyboard(message: Message):
 def is_admin(chat_id):
     cursor.execute("SELECT id FROM admins WHERE id = %s", (str(chat_id),))
     return bool(cursor.fetchone())
+
 
 # Обработка команды /start
 @router.message(Command('start'))
@@ -115,11 +120,11 @@ async def manage_currency(message: Message):
 
 # Обработчик команды добавления валюты
 @router.message(F.text == "Добавить валюту")
-async def add_currency_command(message: Message, state:FSMContext):
+async def add_currency_command(message: Message, state: FSMContext):
     if is_admin(message.chat.id):
         await message.answer("Введите название валюты:")
         await state.update_data(action="Добавить валюту")
-        await state.set_state(Currency.waiting_for_currency_name)
+        await state.set_state(Currency.state_currency_name)
     else:
         await message.answer("Нет доступа к команде")
         return
@@ -127,11 +132,11 @@ async def add_currency_command(message: Message, state:FSMContext):
 
 # Обработчик команды удаления валюты
 @router.message(F.text == "Удалить валюту")
-async def delete_currency_command(message: Message, state:FSMContext):
+async def delete_currency_command(message: Message, state: FSMContext):
     if is_admin(message.chat.id):
         await message.answer("Введите название валюты:")
         await state.update_data(action="Удалить валюту")
-        await state.set_state(Currency.waiting_for_currency_name)
+        await state.set_state(Currency.state_currency_name)
     else:
         await message.answer("Нет доступа к команде")
         return
@@ -139,35 +144,18 @@ async def delete_currency_command(message: Message, state:FSMContext):
 
 # Обработчик команды изменения валюты
 @router.message(F.text == "Изменить курс валюты")
-async def update_currency_command(message: Message, state:FSMContext):
+async def update_currency_command(message: Message, state: FSMContext):
     if is_admin(message.chat.id):
         await message.answer("Введите название валюты:")
         await state.update_data(action="Изменить курс валюты")
-        await state.set_state(Currency.waiting_for_currency_name)
+        await state.set_state(Currency.state_currency_name)
     else:
         await message.answer("Нет доступа к команде")
         return
 
 
-# Команда /get_currencies (доступна всем пользователям)
-@router.message(Command('get_currencies'))
-async def get_currencies(message: Message):
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT currency_name, rate FROM currencies")
-        currencies = cursor.fetchall()
-
-        if not currencies:
-            await message.answer("Нет сохраненных валют!")
-        else:
-            report = "Сохраненные валюты:\n"
-            for currency in currencies:
-                currency_name, rate = currency  # Распаковываем кортеж
-                report += f"1 {currency_name} = {rate} РУБЛЕЙ\n"
-            await message.answer(report)
-
-
 # Получение названия валюты
-@router.message(Currency.waiting_for_currency_name)
+@router.message(Currency.state_currency_name)
 async def get_currency_name(message: Message, state: FSMContext):
     currency_name = message.text.upper()
     data = await state.get_data()
@@ -182,7 +170,7 @@ async def get_currency_name(message: Message, state: FSMContext):
                 await state.clear()
                 return
             await message.answer("Введите курс к рублю:")
-            await state.set_state(Currency.waiting_for_currency_rate)
+            await state.set_state(Currency.state_currency_rate)
     elif action == "Удалить валюту":
         with conn.cursor() as cursor:
             cursor.execute(f"DELETE FROM currencies WHERE currency_name = '{currency_name}'")
@@ -191,10 +179,11 @@ async def get_currency_name(message: Message, state: FSMContext):
             await state.clear()
     elif action == "Изменить курс валюты":
         await message.answer("Введите курс к рублю:")
-        await state.set_state(Currency.waiting_for_currency_rate)
+        await state.set_state(Currency.state_currency_rate)
+
 
 # Получение курса валюты (для добавления и изменения)
-@router.message(Currency.waiting_for_currency_rate)
+@router.message(Currency.state_currency_rate)
 async def get_currency_rate(message: Message, state: FSMContext):
     try:
         currency_rate = float(message.text)
@@ -219,14 +208,33 @@ async def get_currency_rate(message: Message, state: FSMContext):
     await state.clear()
 
 
+
+# Команда /get_currencies (доступна всем пользователям)
+@router.message(Command('get_currencies'))
+async def get_currencies(message: Message):
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT currency_name, rate FROM currencies")
+        currencies = cursor.fetchall()
+
+        if not currencies:
+            await message.answer("Нет сохраненных валют!")
+        else:
+            report = "Сохраненные валюты:\n"
+            for currency in currencies:
+                currency_name, rate = currency  # Распаковываем кортеж
+                report += f"1 {currency_name} = {rate} РУБЛЕЙ\n"
+            await message.answer(report)
+
+
+
 # Обработка команды /convert
 @router.message(Command('convert'))
 async def convert_command(message: Message, state: FSMContext):
     await message.answer("Введите название валюты:")
-    await state.set_state(Conversion.waiting_for_currency_name)
+    await state.set_state(Conversion.state_currency_name)
 
 # Получение названия валюты для конвертации
-@router.message(Conversion.waiting_for_currency_name)
+@router.message(Conversion.state_currency_name)
 async def get_currency_name_for_conversion(message: Message, state: FSMContext):
     currency_name = message.text.upper()
     await state.update_data(currency_name=currency_name)
@@ -241,11 +249,11 @@ async def get_currency_name_for_conversion(message: Message, state: FSMContext):
         else:
             await state.update_data(currency_data=currency_data)
             await message.answer("Введите сумму:")
-            await state.set_state(Conversion.waiting_for_amount)
+            await state.set_state(Conversion.state_amount)
 
 
 # Получение суммы и расчет результата
-@router.message(Conversion.waiting_for_amount)
+@router.message(Conversion.state_amount)
 async def get_amount_and_convert(message: Message, state: FSMContext):
     try:
         amount = float(message.text)
