@@ -1,10 +1,9 @@
 import asyncio
 import logging
 import os
-import datetime
 import requests
 import psycopg2
-from aiogram import Dispatcher, Bot, Router, types
+from aiogram import Dispatcher, Bot, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
