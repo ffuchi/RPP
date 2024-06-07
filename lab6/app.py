@@ -33,15 +33,6 @@ async def process_start_command(message: Message):
         hello = "Приветствую вас, пользователь!"
     await message.answer(hello, reply_markup=get_keyboard(message))
 
-
-@router.message(Command('test'))
-async def testing(message: types.Message):
-    # отправляет HTTP GET-запрос на URL, ответ сохраняется в а.
-    a = requests.get('http://127.0.0.1:5001/route_first')
-    # f- включения значения a.content в сообщение ответа.
-    await message.answer(f'{a.content}')  # ответ- артибут content
-
-
 # Класс для хранения состояний
 class CurrencyManagement(StatesGroup):
     state_action = State()
